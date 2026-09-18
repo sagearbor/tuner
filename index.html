@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ukulele tuner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --lagoon:#DDF1EC; --surface:#F6FCFA; --ink:#0B3B44; --muted:#4A7078;
+    --koa:#8A5A2B; --koa-dark:#5E3B18; --hibiscus:#D62E68; --leaf:#1F8F4E;
+    --string:#F3E6C8; --track:#C4E2DB;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --lagoon:#062A30; --surface:#0C3A42; --ink:#E4F5F0; --muted:#93BDB8;
+      --koa:#9C6A36; --koa-dark:#6B4520; --hibiscus:#FF6A9A; --leaf:#4FD68A;
+      --string:#F3E6C8; --track:#14505A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --lagoon:#062A30; --surface:#0C3A42; --ink:#E4F5F0; --muted:#93BDB8;
+    --koa:#9C6A36; --koa-dark:#6B4520; --hibiscus:#FF6A9A; --leaf:#4FD68A;
+    --string:#F3E6C8; --track:#14505A;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{
+    background:var(--lagoon); color:var(--ink);
+    font-family:"Fredoka",ui-rounded,"Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  main{
+    min-height:100dvh; max-width:28rem; margin:0 auto;
+    padding:1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:1rem;
+  }
+  h1{font-size:1.35rem; font-weight:600}
+  .hint{color:var(--muted); font-size:.95rem; line-height:1.4; margin-top:.2rem}
+
+  /* fretboard with four string pegs */
+  .neck{
+    position:relative; background:linear-gradient(var(--koa),var(--koa-dark));
+    border-radius:1.1rem; padding:.9rem .6rem;
+    display:grid; grid-template-columns:repeat(4,1fr); gap:.4rem;
+  }
+  .peg{
+    position:relative; appearance:none; border:0; background:none; cursor:pointer;
+    font:inherit; color:var(--koa-dark); padding:.6rem 0; display:grid; place-items:center;
+  }
+  .peg::before{ /* the string */
+    content:""; position:absolute; top:-.9rem; bottom:-.9rem; left:50%;
+    width:3px; margin-left:-1.5px; background:var(--string); border-radius:2px; opacity:.85;
+  }
+  .peg span{
+    position:relative; width:3.6rem; height:3.6rem; border-radius:50%;
+    background:var(--string); display:grid; place-items:center;
+    font-size:1.7rem; font-weight:700; border:4px solid transparent;
+    transition:transform .15s, border-color .15s, background .15s;
+  }
+  .peg[aria-pressed="true"] span{border-color:var(--hibiscus); transform:scale(1.08)}
+  .peg.hearing::before{animation:wob .12s linear infinite}
+  .peg.done span{background:var(--leaf); color:#fff}
+  .peg:focus-visible span, button:focus-visible{outline:3px solid var(--hibiscus); outline-offset:3px}
+  @keyframes wob{0%{transform:translateX(-1.5px)}50%{transform:translateX(1.5px)}100%{transform:translateX(-1.5px)}}
+
+  .mode{display:flex; justify-content:space-between; align-items:center; font-size:.95rem; color:var(--muted)}
+  .mode button{
+    appearance:none; border:2px solid var(--track); background:var(--surface); color:var(--ink);
+    font:inherit; font-weight:500; padding:.35rem .8rem; border-radius:999px; cursor:pointer;
+  }
+  .mode button[hidden]{display:none}
+
+  /* reading */
+  .reading{
+    flex:1; background:var(--surface); border-radius:1.4rem; padding:1rem 1rem 1.2rem;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    min-height:17rem;
+  }
+  .note{font-size:clamp(6rem,36vw,10rem); font-weight:700; line-height:.95; letter-spacing:-.02em}
+  .say{font-size:1.5rem; font-weight:600; margin-top:.4rem; min-height:2.2em; display:flex; align-items:center; gap:.4rem}
+  .sub{color:var(--muted); font-size:1rem; min-height:1.4em}
+  .reading.low .note,.reading.low .say,.reading.high .note,.reading.high .say{color:var(--hibiscus)}
+  .reading.ok .note,.reading.ok .say{color:var(--leaf)}
+
+  .meter{width:100%; margin-top:1.1rem}
+  .track{position:relative; height:1.4rem; background:var(--track); border-radius:999px}
+  .zone{position:absolute; left:44%; width:12%; top:0; bottom:0; background:var(--leaf); opacity:.55; border-radius:999px}
+  .needle{
+    position:absolute; top:50%; left:50%; width:2.1rem; height:2.1rem; margin:-1.05rem 0 0 -1.05rem;
+    border-radius:50%; background:var(--ink); border:4px solid var(--surface);
+    transition:left .18s ease-out, background .15s; opacity:.25;
+  }
+  .reading.low .needle,.reading.high .needle{background:var(--hibiscus); opacity:1}
+  .reading.ok .needle{background:var(--leaf); opacity:1}
+  .ends{display:flex; justify-content:space-between; font-size:.9rem; color:var(--muted); margin-top:.45rem}
+
+  .go{
+    appearance:none; border:0; cursor:pointer; font:inherit; font-size:1.25rem; font-weight:600;
+    background:var(--hibiscus); color:#fff; padding:1rem; border-radius:1.1rem; width:100%;
+  }
+  .go.on{background:var(--surface); color:var(--ink); border:2px solid var(--track)}
+  .alert{background:var(--surface); border-left:5px solid var(--hibiscus); padding:.8rem .9rem; border-radius:.6rem; line-height:1.4; font-size:1rem}
+  .alert[hidden]{display:none}
+  @media (prefers-reduced-motion: reduce){ .peg.hearing::before{animation:none} .needle,.peg span{transition:none} }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Ukulele tuner</h1>
+    <p class="hint">Tap a string to hear how it should sound. G is the string nearest your chin.</p>
+  </header>
+
+  <div class="neck" role="group" aria-label="Choose a string">
+    <button class="peg" data-i="0" aria-pressed="false"><span>G</span></button>
+    <button class="peg" data-i="1" aria-pressed="false"><span>C</span></button>
+    <button class="peg" data-i="2" aria-pressed="false"><span>E</span></button>
+    <button class="peg" data-i="3" aria-pressed="false"><span>A</span></button>
+  </div>
+
+  <div class="mode">
+    <span id="modeText">Guessing the string from the sound</span>
+    <button id="autoBtn" hidden>Guess the string for me</button>
+  </div>
+
+  <section class="reading" id="reading" aria-live="polite">
+    <div class="note" id="note">–</div>
+    <div class="say" id="say">Start listening, then pluck one string</div>
+    <div class="sub" id="sub"></div>
+    <div class="meter" aria-hidden="true">
+      <div class="track"><div class="zone"></div><div class="needle" id="needle"></div></div>
+      <div class="ends"><span>Too low</span><span>Just right</span><span>Too high</span></div>
+    </div>
+  </section>
+
+  <p class="alert" id="alert" hidden></p>
+  <button class="go" id="go">Start listening</button>
+</main>
+
+<script>
+(function(){
+  var STRINGS=[{n:'G',f:392.00},{n:'C',f:261.63},{n:'E',f:329.63},{n:'A',f:440.00}];
+  var OK_CENTS=7;
+  var ctx=null, analyser=null, stream=null, buf=null, timer=null;
+  var listening=false, target=null, muteUntil=0, hist=[], lastHeard=0, okSince=0;
+
+  var $=function(id){return document.getElementById(id)};
+  var pegs=[].slice.call(document.querySelectorAll('.peg'));
+  var reading=$('reading'), noteEl=$('note'), sayEl=$('say'), subEl=$('sub'),
+      needle=$('needle'), goBtn=$('go'), alertEl=$('alert'), autoBtn=$('autoBtn'), modeText=$('modeText');
+
+  function ensureCtx(){
+    if(!ctx){ var AC=window.AudioContext||window.webkitAudioContext; ctx=new AC(); }
+    if(ctx.state==='suspended') ctx.resume();
+    return ctx;
+  }
+
+  /* reference tone: a soft plucked note */
+  function playTone(f){
+    var c=ensureCtx(), t=c.currentTime;
+    var g=c.createGain(); g.connect(c.destination);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.5,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+2.2);
+    [[1,'triangle',1],[2,'sine',0.25]].forEach(function(p){
+      var o=c.createOscillator(), og=c.createGain();
+      o.type=p[1]; o.frequency.value=f*p[0]; og.gain.value=p[2];
+      o.connect(og); og.connect(g); o.start(t); o.stop(t+2.3);
+    });
+    muteUntil=performance.now()+2400; hist=[];
+  }
+
+  function setTarget(i){
+    target=i;
+    pegs.forEach(function(p,k){p.setAttribute('aria-pressed', String(k===i)); p.classList.remove('done')});
+    autoBtn.hidden=(i===null);
+    modeText.textContent = i===null ? 'Guessing the string from the sound' : 'Tuning the '+STRINGS[i].n+' string';
+    hist=[]; idle();
+  }
+
+  pegs.forEach(function(p){
+    p.addEventListener('click',function(){
+      var i=+p.dataset.i; setTarget(i); playTone(STRINGS[i].f);
+    });
+  });
+  autoBtn.addEventListener('click',function(){setTarget(null)});
+
+  /* pitch detection by autocorrelation, limited to the range a ukulele string can be in */
+  function detect(b,sr){
+    var n=b.length, rms=0, i, j;
+    for(i=0;i<n;i++) rms+=b[i]*b[i];
+    if(Math.sqrt(rms/n)<0.012) return -1;
+    var minLag=Math.floor(sr/750), maxLag=Math.min(Math.floor(sr/110), n>>1);
+    var m=n-maxLag, c=new Float32Array(maxLag+2);
+    for(i=0;i<=maxLag+1;i++){ var s=0; for(j=0;j<m;j++) s+=b[j]*b[j+i]; c[i]=s; }
+    var d=1; while(d<maxLag && c[d]>c[d+1]) d++;
+    if(d<minLag) d=minLag;
+    var best=-1, pos=-1;
+    for(i=d;i<=maxLag;i++){ if(c[i]>best){best=c[i];pos=i;} }
+    if(pos<=0 || best<0.5*c[0]) return -1;
+    /* prefer the first strong peak so we don't land an octave low */
+    for(i=d;i<pos;i++){ if(c[i]>0.9*best && c[i]>=c[i-1] && c[i]>=c[i+1]){pos=i;break;} }
+    var x1=c[pos-1], x2=c[pos], x3=c[pos+1], a=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
+    var T=pos; if(a) T=pos-bb/(2*a);
+    return sr/T;
+  }
+
+  function median(a){var s=a.slice().sort(function(x,y){return x-y});return s[s.length>>1]}
+
+  function tick(){
+    if(!listening) return;
+    var now=performance.now();
+    if(now<muteUntil) return;
+    analyser.getFloatTimeDomainData(buf);
+    var f=detect(buf,ctx.sampleRate);
+    if(f>0){
+      hist.push(f); if(hist.length>5) hist.shift();
+      lastHeard=now;
+      if(hist.length>=3) show(median(hist));
+    }else if(now-lastHeard>1800){ hist=[]; idle(); }
+  }
+
+  function idle(){
+    reading.className='reading';
+    pegs.forEach(function(p){p.classList.remove('hearing')});
+    noteEl.textContent = target===null ? '–' : STRINGS[target].n;
+    sayEl.textContent = listening ? 'Pluck one string' : 'Start listening, then pluck one string';
+    subEl.textContent=''; needle.style.left='50%'; okSince=0;
+  }
+
+  function show(f){
+    var i=target;
+    if(i===null){
+      var bestC=1e9; STRINGS.forEach(function(s,k){var c=Math.abs(1200*Math.log2(f/s.f)); if(c<bestC){bestC=c;i=k;}});
+    }
+    var cents=1200*Math.log2(f/STRINGS[i].f);
+    var shown=Math.max(-50,Math.min(50,cents));
+    needle.style.left=(50+shown*0.92)+'%';
+    noteEl.textContent=STRINGS[i].n;
+    pegs.forEach(function(p,k){p.classList.toggle('hearing',k===i)});
+    var a=Math.abs(cents);
+    if(a<=OK_CENTS){
+      reading.className='reading ok'; sayEl.textContent='In tune'; subEl.textContent='Leave this peg alone now';
+      if(!okSince) okSince=performance.now();
+      if(performance.now()-okSince>600) pegs[i].classList.add('done');
+    }else{
+      okSince=0; pegs[i].classList.remove('done');
+      var low=cents<0;
+      reading.className='reading '+(low?'low':'high');
+      var size = a>120 ? 'a lot' : a>35 ? 'some more' : 'a tiny bit';
+      sayEl.textContent=(low?'↑ Go higher':'↓ Go lower');
+      subEl.textContent=(low?'Tighten':'Loosen')+' the '+STRINGS[i].n+' peg '+size;
+    }
+  }
+
+  function stop(){
+    listening=false; clearInterval(timer);
+    if(stream) stream.getTracks().forEach(function(t){t.stop()}); stream=null;
+    goBtn.textContent='Start listening'; goBtn.classList.remove('on'); idle();
+  }
+
+  function start(){
+    alertEl.hidden=true; ensureCtx();
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ return noMic('This page can’t reach the microphone here.'); }
+    navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
+    .then(function(s){
+      stream=s;
+      var src=ctx.createMediaStreamSource(s);
+      analyser=ctx.createAnalyser(); analyser.fftSize=4096; buf=new Float32Array(analyser.fftSize);
+      src.connect(analyser);
+      listening=true; lastHeard=0; hist=[];
+      goBtn.textContent='Stop listening'; goBtn.classList.add('on'); idle();
+      timer=setInterval(tick,70);
+      try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').catch(function(){}); }catch(e){}
+    })
+    .catch(function(e){
+      noMic(e && e.name==='NotAllowedError'
+        ? 'The microphone isn’t allowed for this page. It needs to be opened from a normal https web address.'
+        : 'This page can’t reach the microphone here.');
+    });
+  }
+
+  function noMic(msg){
+    alertEl.textContent=msg+' You can still tune by ear: tap a string above, then turn its peg until the ukulele matches the sound.';
+    alertEl.hidden=false;
+  }
+
+  goBtn.addEventListener('click',function(){ listening ? stop() : start(); });
+  document.addEventListener('visibilitychange',function(){ if(document.hidden && listening) stop(); });
+})();
+</script>
+</body>
+</html>
